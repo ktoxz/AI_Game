@@ -1,0 +1,34 @@
+# Mine Cart Camera Collector
+
+Trò chơi Pygame sử dụng webcam để nhận diện mũi người chơi và điều khiển xe mỏ thu thập tiền rơi. Nhặt tiền để tăng điểm, tránh bom (trúng 3 lần sẽ thua) và xem bảng xếp hạng bên cạnh.
+
+## Cách chạy
+1. Cài đặt phụ thuộc (Python 3.11):
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Kết nối webcam và chạy trò chơi:
+   ```bash
+   python main.py
+   ```
+   hoặc trải nghiệm phiên bản **Chém Hoa Quả** sử dụng bàn tay để điều khiển đường chém:
+   ```bash
+   python chemhoaqua.py
+   ```
+
+## Điều khiển
+- Di chuyển mũi của bạn trái/phải trước webcam để điều khiển xe mỏ.
+- Nhấn **R** để chơi lại sau khi thua.
+- Nhấn **Esc** hoặc đóng cửa sổ để thoát.
+
+## Cơ chế trò chơi
+- Hai loại vật phẩm: **tiền** (vàng) và **bom** (đỏ) rơi từ trên xuống.
+- Nhặt tiền +1 điểm, trúng bom kích hoạt hiệu ứng nổ và cộng vào số lần dính bom.
+- Sau mỗi **15 giây**, tốc độ rơi và tần suất xuất hiện vật phẩm sẽ tăng.
+- Bảng xếp hạng bên phải lưu lại 5 điểm cao nhất trong file `scores.json`.
+- Góc dưới phải hiển thị khung webcam thu nhỏ kèm chấm xanh tại vị trí mũi đang được nhận diện.
+
+## Chém Hoa Quả (chemhoaqua.py)
+- Điều khiển bằng đầu ngón tay trỏ: di chuyển và vung tay nhanh để chém trái cây, tránh bom (dính 3 bom hoặc bỏ lỡ 3 trái cây sẽ thua).
+- Bảng xếp hạng riêng lưu trong `slash_scores.json`, camera thu nhỏ kèm chấm xanh để theo dõi ngón tay.
+- Tăng tốc độ phóng trái cây sau mỗi 12 giây, hiệu ứng vệt chém và hạt sáng mô phỏng lát cắt.
