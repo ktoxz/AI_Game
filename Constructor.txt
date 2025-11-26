@@ -1,0 +1,7 @@
+Hãy tạo 1 trò chơi, sử dụng camera của người dùng để điều khiển 1 xe mỏ nhặt tiền. Hãy:
+1. Thiết kế 1 pygame sử dụng camera để nhận diện mũi của người chơi, điều khiển dựa trên sự duy chuyển của mũi
+2. Thiết kế 2 loại vật phẩm rớt từ trên xuống, bao gồm tiền và bom, nếu dính bom 3 lần coi như thua
+3. Thiết kế 1 bảng xếp hạng để ở bên cạnh, ghi lại số điểm (1 tiền là 1 điểm)
+4. Cứ sau 15s, ta sẽ tăng tốc trò chơi để làm trò chơi khó hơn
+5. Thêm các hiệu ứng khi nhặt tiền hoặc bom
+6. Thoải mái sử dụng các thư viện khác nhau, sau đó hãy viết requirements.txt để tôi có thể sử dụng trên python3.11
