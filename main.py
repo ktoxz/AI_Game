@@ -125,8 +125,12 @@ class MineCartGame:
         self.width, self.height = 900, 600
         self.play_width = 650
         self.screen = pygame.display.set_mode((self.width, self.height))
-        self.font = pygame.font.SysFont("arial", 24)
-        self.big_font = pygame.font.SysFont("arial", 48, bold=True)
+        try:
+            self.font = pygame.font.SysFont("arial", 24)
+            self.big_font = pygame.font.SysFont("arial", 48, bold=True)
+        except Exception:
+            self.font = pygame.font.Font(None, 24)
+            self.big_font = pygame.font.Font(None, 48)
 
         self.capture = cv2.VideoCapture(0)
         if not self.capture.isOpened():
@@ -135,6 +139,7 @@ class MineCartGame:
 
         self.tracker = NoseTracker()
         self.scoreboard = ScoreBoard(Path("scores.json"))
+        self.last_frame: np.ndarray | None = None
         self.reset()
 
     def reset(self) -> None:
@@ -153,7 +158,8 @@ class MineCartGame:
         kind = "coin" if random.random() < 0.7 else "bomb"
         x = random.randint(30, self.play_width - 30)
         radius = 14 if kind == "coin" else 16
-        speed = (160 if kind == "coin" else 180) * speed_factor
+        base_speed = 140 if kind == "coin" else 170
+        speed = base_speed * speed_factor
         self.items.append(FallingItem(kind, x, -20, speed, radius))
 
     def update_player(self, nose_pos: tuple[float, float] | None) -> None:
@@ -224,6 +230,29 @@ class MineCartGame:
             txt = self.font.render(f"{i}. {score}", True, (210, 210, 220))
             self.screen.blit(txt, (self.play_width + 20, 240 + i * 28))
 
+    def draw_camera_view(self, nose_pos: tuple[float, float] | None) -> None:
+        if self.last_frame is None:
+            return
+
+        view_width = self.width - self.play_width - 40
+        view_height = 180
+        frame = cv2.resize(self.last_frame, (view_width, view_height))
+        display_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        if nose_pos:
+            px = int(nose_pos[0] * view_width)
+            py = int(nose_pos[1] * view_height)
+            cv2.circle(display_frame, (px, py), 6, (40, 230, 90), 2)
+            cv2.circle(display_frame, (px, py), 3, (30, 200, 60), -1)
+
+        surface = pygame.image.frombuffer(display_frame.tobytes(), (view_width, view_height), "RGB")
+        cam_x = self.play_width + 10
+        cam_y = self.height - view_height - 20
+        pygame.draw.rect(self.screen, (32, 36, 48), (cam_x - 4, cam_y - 4, view_width + 8, view_height + 8), 2)
+        label = self.font.render("Camera", True, (210, 210, 220))
+        self.screen.blit(label, (cam_x, cam_y - 28))
+        self.screen.blit(surface, (cam_x, cam_y))
+
     def draw_items(self) -> None:
         for item in self.items:
             item.draw(self.screen)
@@ -276,6 +305,7 @@ class MineCartGame:
             if not ret:
                 continue
 
+            self.last_frame = frame
             nose = self.tracker.detect(frame)
             self.update_player(nose)
 
@@ -290,7 +320,7 @@ class MineCartGame:
 
             if not self.game_over:
                 for item in self.items[:]:
-                    item.update(dt * 60)
+                    item.update(dt)
                     if item.y > self.height + 40:
                         self.items.remove(item)
                 self.handle_collisions()
@@ -304,6 +334,7 @@ class MineCartGame:
             self.draw_player()
             self.draw_flash()
             self.draw_scoreboard()
+            self.draw_camera_view(nose)
             self.draw_game_over()
             pygame.display.flip()
 

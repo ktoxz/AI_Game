@@ -22,3 +22,4 @@ Trò chơi Pygame sử dụng webcam để nhận diện mũi người chơi và
 - Nhặt tiền +1 điểm, trúng bom kích hoạt hiệu ứng nổ và cộng vào số lần dính bom.
 - Sau mỗi **15 giây**, tốc độ rơi và tần suất xuất hiện vật phẩm sẽ tăng.
 - Bảng xếp hạng bên phải lưu lại 5 điểm cao nhất trong file `scores.json`.
+- Góc dưới phải hiển thị khung webcam thu nhỏ kèm chấm xanh tại vị trí mũi đang được nhận diện.
