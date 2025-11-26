@@ -23,12 +23,6 @@ class FallingItem:
     def update(self, dt: float) -> None:
         self.y += self.speed * dt
 
-    def draw(self, surface: pygame.Surface) -> None:
-        color = (248, 196, 43) if self.kind == "coin" else (200, 48, 48)
-        pygame.draw.circle(surface, color, (int(self.x), int(self.y)), self.radius)
-        outline = (255, 235, 128) if self.kind == "coin" else (250, 128, 128)
-        pygame.draw.circle(surface, outline, (int(self.x), int(self.y)), self.radius, 2)
-
 
 @dataclass
 class Particle:
@@ -46,10 +40,11 @@ class Particle:
 
     def draw(self, surface: pygame.Surface) -> None:
         if self.life > 0:
+            if not hasattr(self, "_sprite"):
+                Particle._sprite = pygame.Surface((6, 6), pygame.SRCALPHA)
             alpha = max(30, min(255, int(255 * (self.life / 0.6))))
-            s = pygame.Surface((6, 6), pygame.SRCALPHA)
-            s.fill((*self.color, alpha))
-            surface.blit(s, (self.x, self.y))
+            Particle._sprite.fill((*self.color, alpha))
+            surface.blit(Particle._sprite, (self.x, self.y))
 
 
 @dataclass
@@ -124,13 +119,14 @@ class MineCartGame:
         self.clock = pygame.time.Clock()
         self.width, self.height = 900, 600
         self.play_width = 650
-        self.screen = pygame.display.set_mode((self.width, self.height))
+        flags = pygame.HWSURFACE | pygame.DOUBLEBUF
         try:
-            self.font = pygame.font.SysFont("arial", 24)
-            self.big_font = pygame.font.SysFont("arial", 48, bold=True)
-        except Exception:
-            self.font = pygame.font.Font(None, 24)
-            self.big_font = pygame.font.Font(None, 48)
+            self.screen = pygame.display.set_mode((self.width, self.height), flags, vsync=1)
+        except TypeError:
+            self.screen = pygame.display.set_mode((self.width, self.height), flags)
+
+        self.font = self._load_font(24)
+        self.big_font = self._load_font(48, bold=True)
 
         self.capture = cv2.VideoCapture(0)
         if not self.capture.isOpened():
@@ -140,7 +136,45 @@ class MineCartGame:
         self.tracker = NoseTracker()
         self.scoreboard = ScoreBoard(Path("scores.json"))
         self.last_frame: np.ndarray | None = None
+        self._build_surfaces()
         self.reset()
+
+    def _load_font(self, size: int, bold: bool = False) -> pygame.font.Font:
+        candidates = ["DejaVuSans", "Arial", "Helvetica", "LiberationSans", "sans-serif"]
+        for name in candidates:
+            matched = pygame.font.match_font(name, bold=bold)
+            if matched:
+                return pygame.font.Font(matched, size)
+        return pygame.font.Font(None, size)
+
+    def _build_surfaces(self) -> None:
+        self.background = pygame.Surface((self.play_width, self.height)).convert()
+        for y in range(self.height):
+            t = y / self.height
+            r = int(18 + 20 * t)
+            g = int(18 + 24 * t)
+            b = int(28 + 30 * t)
+            pygame.draw.line(self.background, (r, g, b), (0, y), (self.play_width, y))
+
+        self.coin_surface = self._make_item_surface((252, 209, 77), (255, 245, 196), 14)
+        self.bomb_surface = self._make_item_surface((210, 62, 62), (255, 172, 172), 16)
+        self.spark_surface = pygame.Surface((8, 8), pygame.SRCALPHA)
+        pygame.draw.circle(self.spark_surface, (255, 255, 255, 160), (4, 4), 4)
+
+    def _make_item_surface(self, base: tuple[int, int, int], highlight: tuple[int, int, int], radius: int) -> pygame.Surface:
+        size = radius * 2 + 6
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        center = size // 2
+        for r in range(radius, 0, -1):
+            lerp = r / radius
+            color = (
+                int(base[0] * lerp + highlight[0] * (1 - lerp)),
+                int(base[1] * lerp + highlight[1] * (1 - lerp)),
+                int(base[2] * lerp + highlight[2] * (1 - lerp)),
+            )
+            pygame.draw.circle(surf, color, (center, center), r)
+        pygame.draw.circle(surf, (255, 255, 255, 90), (center - radius // 3, center - radius // 3), radius // 2)
+        return surf.convert_alpha()
 
     def reset(self) -> None:
         self.player_rect = pygame.Rect(self.play_width // 2 - 40, self.height - 60, 80, 30)
@@ -178,7 +212,7 @@ class MineCartGame:
                     self.texts.append(FloatingText("+1", item.x, item.y, 1.0, (248, 196, 43)))
                 else:
                     self.bomb_hits += 1
-                    self.flash_timer = 0.3
+                    self.flash_timer = 0.35
                     self.spawn_effect(item, (230, 76, 60))
                     self.texts.append(FloatingText("BÙM!", item.x, item.y, 1.0, (230, 76, 60)))
                     if self.bomb_hits >= 3:
@@ -186,16 +220,18 @@ class MineCartGame:
                         self.scoreboard.add_score(self.score)
 
     def spawn_effect(self, item: FallingItem, color: tuple) -> None:
-        for _ in range(16):
+        for _ in range(24):
             angle = random.uniform(0, math.tau)
-            speed = random.uniform(80, 180)
+            speed = random.uniform(120, 240)
             vx = math.cos(angle) * speed
             vy = math.sin(angle) * speed
-            self.particles.append(Particle(item.x, item.y, vx, vy, 0.6, color))
+            jitter = (random.randint(-2, 2), random.randint(-2, 2))
+            self.particles.append(Particle(item.x + jitter[0], item.y + jitter[1], vx, vy, 0.5, color))
 
     def update_effects(self, dt: float) -> None:
         for particle in self.particles[:]:
             particle.update(dt)
+            particle.vy += 200 * dt
             if particle.life <= 0:
                 self.particles.remove(particle)
         for text in self.texts[:]:
@@ -204,13 +240,17 @@ class MineCartGame:
                 self.texts.remove(text)
 
     def draw_background(self) -> None:
-        self.screen.fill((18, 18, 28))
-        pygame.draw.rect(self.screen, (30, 30, 44), (0, 0, self.play_width, self.height))
-        pygame.draw.rect(self.screen, (45, 45, 55), self.player_rect.inflate(8, 8), 2, border_radius=6)
+        self.screen.fill((12, 12, 18))
+        self.screen.blit(self.background, (0, 0))
+        glow_rect = self.player_rect.inflate(140, 20)
+        glow_surface = pygame.Surface(glow_rect.size, pygame.SRCALPHA)
+        pygame.draw.ellipse(glow_surface, (90, 160, 255, 70), glow_surface.get_rect())
+        self.screen.blit(glow_surface, glow_rect.topleft)
 
     def draw_scoreboard(self) -> None:
         panel_rect = pygame.Rect(self.play_width, 0, self.width - self.play_width, self.height)
         pygame.draw.rect(self.screen, (22, 26, 38), panel_rect)
+        pygame.draw.rect(self.screen, (60, 70, 90), panel_rect, 3)
         title = self.big_font.render("Bảng điểm", True, (235, 235, 245))
         self.screen.blit(title, (self.play_width + 20, 20))
 
@@ -255,20 +295,26 @@ class MineCartGame:
 
     def draw_items(self) -> None:
         for item in self.items:
-            item.draw(self.screen)
+            surface = self.coin_surface if item.kind == "coin" else self.bomb_surface
+            rect = surface.get_rect(center=(int(item.x), int(item.y)))
+            self.screen.blit(surface, rect)
         for particle in self.particles:
             particle.draw(self.screen)
+            self.screen.blit(self.spark_surface, (particle.x, particle.y), special_flags=pygame.BLEND_ADD)
         for text in self.texts:
             text.draw(self.screen, self.font)
 
     def draw_player(self) -> None:
-        pygame.draw.rect(self.screen, (90, 180, 255), self.player_rect, border_radius=8)
-        pygame.draw.rect(self.screen, (255, 255, 255), self.player_rect, 2, border_radius=8)
+        body = pygame.Surface(self.player_rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(body, (110, 190, 255), body.get_rect(), border_radius=10)
+        pygame.draw.rect(body, (255, 255, 255), body.get_rect(), 2, border_radius=10)
+        pygame.draw.rect(body, (255, 255, 255, 60), (8, 6, self.player_rect.width - 16, 8), border_radius=6)
+        self.screen.blit(body, self.player_rect.topleft)
 
     def draw_flash(self) -> None:
         if self.flash_timer > 0:
             overlay = pygame.Surface((self.play_width, self.height))
-            overlay.set_alpha(int(180 * (self.flash_timer / 0.3)))
+            overlay.set_alpha(int(180 * (self.flash_timer / 0.35)))
             overlay.fill((150, 0, 0))
             self.screen.blit(overlay, (0, 0))
 
@@ -287,7 +333,7 @@ class MineCartGame:
 
     def run(self) -> None:
         while True:
-            dt = self.clock.tick(60) / 1000.0
+            dt = min(self.clock.tick(120) / 1000.0, 1 / 30)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.capture.release()
